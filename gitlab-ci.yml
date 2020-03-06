@@ -1,0 +1,33 @@
+stages:
+  - build
+  - test
+  - deploy
+  
+build_app:
+  stage: build
+  image: docker
+  services:
+  - docker:dind
+
+  script:
+  - docker build . -t php001
+  - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+  - docker push php001
+  
+test:
+  stage: test
+  image: docker
+  services:
+  - docker:dind
+
+  script:
+  - docker run -d php001
+  - export OUTPUT=$(docker exec test curl -sSFL localhost)
+  - test "$OUTPUT" == "Hello World!" | | (echo $OUTPUT && exit 1)
+
+deploy:
+  stage: deploy
+  image: bitnami/kubectl
+  script:
+  - kubectl create deployment phphelloworld --image=php001
+  - kubectl export deployment phphelloworld --port 80 --target-port 8080 type=NodePort 
